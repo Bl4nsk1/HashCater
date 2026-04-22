@@ -197,7 +197,8 @@ Do not use against networks without permission.
 ## 🤝 Credits
 
 - Hashcat  
-- WPA/WPA2 research community  
+- WPA/WPA2 research community
+- PSCat - https://github.com/DaDubbs/PSCat
 
 ---
 
