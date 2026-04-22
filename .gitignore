@@ -1,32 +1,19 @@
-# Ignore static folder
 static/
 
-# (Opcional) manter a pasta mas ignorar tudo dentro
 # static/*
 # !static/.gitkeep
 
-# Logs
 *.log
 
-# Temp files
 *.tmp
 *.cache
 
-# OS
-.DS_Store
 Thumbs.db
 
-# IDEs
 .vscode/
 .idea/
 
-# Node (se usar)
 node_modules/
 
-# Python (se usar)
-__pycache__/
-*.pyc
-
-# Build / dist
 dist/
 build/
