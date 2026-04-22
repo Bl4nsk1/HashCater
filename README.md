@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Automated Hashcat Wrapper for WPA/WPA2 (.hc22000) Cracking</b><br>
-  Fast, smart and practical password recovery automation
+  Fast, smart and practical password cracking automation
 </p>
 
 <p align="center">
