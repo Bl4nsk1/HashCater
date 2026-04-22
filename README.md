@@ -1,18 +1,14 @@
-# HashCater
 ![hashcater](/static/logo.png)
-
 <p align="center">
   <b>Automated Hashcat Wrapper for WPA/WPA2 (.hc22000) Cracking</b><br>
   Fast, smart and practical password cracking automation
 </p>
-
 <p align="center">
   <img src="https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg">
   <img src="https://img.shields.io/badge/Hashcat-supported-orange.svg">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey.svg">
   <img src="https://img.shields.io/badge/license-MIT-green.svg">
 </p>
-
 ---
 
 ## ⚡ Overview
