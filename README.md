@@ -1,4 +1,5 @@
 # HashCater
+![hashcater](/static/logo.png)
 
 <p align="center">
   <b>Automated Hashcat Wrapper for WPA/WPA2 (.hc22000) Cracking</b><br>
