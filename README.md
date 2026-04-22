@@ -64,7 +64,7 @@ All while minimizing manual interaction.
 - Handshakes captured and converted to hc22000   
 
 ```powershell
-git clone **https://github.com/Bl4nsk1/hashcater**
+git clone *https://github.com/Bl4nsk1/hashcater*
 cd HashCater
 ```
 
