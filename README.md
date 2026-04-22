@@ -59,8 +59,9 @@ All while minimizing manual interaction.
 
 ### Requirements
 
-- Hashcat  
-- PowerShell 5.1+ or PowerShell Core  
+- Hashcat - https://hashcat.net/hashcat/
+- PowerShell 5.1+ or PowerShell Core
+- Handshakes captured and converted to hc22000   
 
 ```powershell
 git clone https://github.com/yourusername/hashcater
