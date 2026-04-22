@@ -1,4 +1,5 @@
 ![hashcater](/static/logo.png)
+
 <p align="center">
   <b>Automated Hashcat Wrapper for WPA/WPA2 (.hc22000) Cracking</b><br>
   Fast, smart and practical password cracking automation
@@ -9,6 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey.svg">
   <img src="https://img.shields.io/badge/license-MIT-green.svg">
 </p>
+
 ---
 
 ## ⚡ Overview
@@ -22,6 +24,22 @@ It orchestrates attacks intelligently by combining:
 - SSID-based heuristics  
 
 All while minimizing manual interaction.
+
+---
+
+## 📸 Demo
+
+### 🔹 Running HashCater
+
+![execution](./static/help_menu.png)
+
+### 🔹 Attack Phase
+
+![wordlist](./static/running.png)
+
+### 🔹 Successful Crack
+
+![cracked](./static/success.png)
 
 ---
 
