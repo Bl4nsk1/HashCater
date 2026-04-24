@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg">
   <img src="https://img.shields.io/badge/Hashcat-supported-orange.svg">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey.svg">
-  <img src="https://img.shields.io/badge/license-MIT-green.svg">
+  <img src="https://img.shields.io/github/license/Bl4nsk1/HashCater">
 </p>
 
 ---
