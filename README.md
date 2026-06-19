@@ -13,211 +13,90 @@
 
 ---
 
+# HashCater
+
+**Automated Hashcat Cracking for WPA/WPA2 Pentests**
+
+Thermal-safe, smart Wi-Fi hash cracking automation
+
 ## ⚡ Overview
 
-**HashCater** is a lightweight automation wrapper for Hashcat focused on WPA/WPA2 (`.hc22000`) workflows.
+HashCater automates **Hashcat** execution against `.hc22000` files with intelligent mask prioritization, GPU thermal protection, and ISP-based heuristics for Brazilian networks.
 
-It orchestrates attacks intelligently by combining:
+## 🔥 Features
 
-- Wordlists  
-- Brute-force masks  
-- SSID-based heuristics  
+- Wordlist, bruteforce, or combined attack modes
+- SSID extraction directly from `.hc22000` files
+- SSID-based smart mask generation
+- ISP heuristics (VIVO, CLARO, TP-LINK, NET, WIFI)
+- GPU thermal protection (`--hwmon-temp-abort`)
+- Configurable workload and cooldown between runs
+- Log file support for long sessions
+- Summary report (cracked / failed)
 
-All while minimizing manual interaction.
+## 🛠 Requirements
 
----
+- Windows with PowerShell 5.1+
+- [Hashcat](https://hashcat.net/hashcat/)
+- GPU with OpenCL/CUDA support
+- `.hc22000` files (use [Cap2Hash](https://github.com/Bl4nsk1/Cap2Hash) to convert captures)
 
-## 📸 Demo
-
-### 🔹 Running HashCater
-
-![execution](./static/help_menu.png)
-
-### 🔹 Attack Phase
-
-![wordlist](./static/running.png)
-
-### 🔹 Successful Crack
-
-![cracked](./static/success.png)
-
----
-
-## 🚀 Features
-
-- ⚡ Automated attack chaining (wordlist → masks → fallback)  
-- 🧠 SSID-aware mask prioritization  
-- 🔍 Automatic crack detection (`--show`)  
-- ⏱️ Runtime-limited mask execution  
-- 🛠️ Native Hashcat parameter passthrough  
-- 📖 Built-in Hashcat help mode  
-- 🧾 Verbose logging support  
-
----
-
-## 📦 Installation
-
-### Requirements
-
-- Hashcat - https://hashcat.net/hashcat/
-- PowerShell 5.1+ or PowerShell Core
-- Handshakes captured and converted to hc22000   
+## 🚀 Usage
 
 ```powershell
-git clone https://github.com/Bl4nsk1/hashcater
-cd HashCater
+# Load and run (bypasses ExecutionPolicy)
+$script = Get-Content '.\HashCater.ps1' -Raw
+$sb = [scriptblock]::Create($script)
+
+# Wordlist attack
+& $sb -Hashs C:\handshakes -Hashcat C:\hashcat -AttackMode wordlist -Wordlist C:\wordlists
+
+# Bruteforce
+& $sb -Hashs C:\handshakes -Hashcat C:\hashcat -AttackMode bruteforce
+
+# Both with logging
+& $sb -Hashs C:\handshakes -Hashcat C:\hashcat -AttackMode both -Wordlist C:\wordlists -LogFile C:\results.log
 ```
-
----
-
-## 🛠️ Usage
-
-```powershell
-.\HashCater.ps1 -Hashs <path> -Hashcat <path> -AttackMode <mode> [options]
-```
-
----
 
 ## ⚙️ Parameters
 
-| Flag | Description |
-|------|------------|
-| `-Hashs` | Path to `.hc22000` files |
-| `-Hashcat` | Path to Hashcat directory |
-| `-AttackMode` | `wordlist`, `bruteforce`, `both` |
-| `-Wordlist` | Path to wordlists |
-| `-Params` | Extra Hashcat parameters |
-| `-Mode` | Hash mode (default: `22000`) |
-| `-MaskRuntime` | Runtime per mask (seconds) |
-| `-VerboseMode` | Enable debug logs |
-| `-HashcatHelp` | Show Hashcat help |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `-Hashs` | — | Path to `.hc22000` files |
+| `-Hashcat` | — | Path to hashcat folder |
+| `-AttackMode` | — | `wordlist` \| `bruteforce` \| `both` |
+| `-Wordlist` | — | Path to wordlist folder |
+| `-Params` | — | Extra hashcat parameters |
+| `-Mode` | 22000 | Hash mode |
+| `-MaskRuntime` | 600 | Seconds per mask |
+| `-CooldownSeconds` | 15 | Pause between runs (GPU cooling) |
+| `-TempAbort` | 90 | GPU temp limit (°C) |
+| `-Workload` | 3 | Hashcat workload (1-4) |
+| `-LogFile` | — | Output log path |
+| `-VerboseMode` | — | Detailed command logging |
 
----
-
-## 📚 Examples
-
-### Basic usage
-
-```powershell
-.\HashCater.ps1 `
-  -Hashs C:\captures `
-  -Hashcat C:\hashcat `
-  -AttackMode both `
-  -Wordlist C:\wordlists
-```
-
----
-
-### Custom performance tuning
-
-```powershell
-.\HashCater.ps1 `
-  -Hashs . `
-  -Hashcat . `
-  -AttackMode bruteforce `
-  -Params "-w 4 -O --status"
-```
-
----
-
-### Show Hashcat help
-
-```powershell
-.\HashCater.ps1 -HashcatHelp -Hashcat C:\hashcat
-```
-
----
-
-## 🔄 Attack Flow
+## ⚙️ Workflow
 
 ```
-for each .hc22000:
-    extract SSID
-    run wordlist attack (if enabled)
-    if cracked → stop
-    run prioritized masks
-    if cracked → stop
-    fallback to numeric brute-force
+.hc22000 → Wordlist Attack → Bruteforce (smart masks) → Fallback (8-digit) → Result
 ```
 
----
-
-## 🧠 Mask Strategy
-
-### Default
+## 📂 Output
 
 ```
-?d?d?d?d?d?d?d?d
-?d?d?d?d?d?d?d?d?d?d
-?l?l?l?l?l?l?d?d
-?l?l?l?l?d?d?d?d
+[10:30:15] [+] Processing: network.hc22000
+[10:30:15] [SSID] VIVO-A1B2
+[10:30:15] [MASK] ?d?d?d?d?d?d?d?d
+[10:35:20] [CRACKED - MASK] hash:12345678
+[10:35:35] [DONE] Processed 5 files | Cracked: 3 | Failed: 2
 ```
 
-### SSID-based
+## 📜 License
 
-```
-<ssid>?d?d
-<ssid>?d?d?d
-<ssid>?d?d?d?d
-```
+MIT License
 
-### ISP Heuristics
+Copyright (c) 2026 Bl4nsk1
 
-Prioritizes numeric masks for:
+## 👤 Author
 
-- VIVO  
-- CLARO  
-- TP-LINK  
-- NET  
-- WIFI  
-
----
-
-## 🧾 Logging
-
-```
-[12:00:00] [+] Processing: file.hc22000
-[12:00:01] [SSID] MyNetwork
-[12:00:02] [WL] rockyou.txt
-[12:00:10] [CRACKED - WL]
-```
-
----
-
-## 🎯 Design Philosophy
-
-- Minimal interaction  
-- Smart defaults  
-- Efficient attack ordering  
-- Compatibility with native Hashcat  
-
----
-
-## 🗺️ Roadmap
-
-- Hybrid attacks (`-a 6 / -a 7`)  
-- Rule-based attacks (`best64`, `dive`)  
-- GPU auto-tuning  
-- Multi-GPU support  
-- Integration with `hcxpcapngtool`  
-
----
-
-## ⚠️ Disclaimer
-
-This tool is intended for **authorized security testing only**.  
-Do not use against networks without permission.
-
----
-
-## 🤝 Credits
-
-- Hashcat  
-- WPA/WPA2 research community
-- PSCat - https://github.com/DaDubbs/PSCat
-
----
-
-## ⭐ Contributing
-
-Pull requests, issues and ideas are welcome.
+[Bl4nsk1](https://github.com/Bl4nsk1)
