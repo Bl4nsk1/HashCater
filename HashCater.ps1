@@ -4,15 +4,24 @@ param(
     [string]$Hashcat,
     [switch]$HashcatHelp,
     [string]$Wordlist,
+
     [ValidateSet("wordlist","bruteforce","both")]
     [string]$AttackMode,
+
     [string]$Params,
+
     [int]$Mode = 22000,
-    [int]$MaskRuntime = 600,
-    [int]$CooldownSeconds = 15,
-    [int]$TempAbort = 90,
-    [int]$Workload = 3,
+
+    [int]$MaskRuntime = 1800,
+    [int]$CooldownSeconds = 60,
+
+    [int]$TempAbort = 80,
+    [int]$GpuTempRetain = 70,
+
+    [int]$Workload = 2,
+
     [string]$LogFile,
+
     [switch]$VerboseMode
 )
 
@@ -20,28 +29,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "HashCater - Hashcat Automation Tool" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "Usage:"
-    Write-Host ".\HashCater.ps1 -Hashs <path> -Hashcat <path> -AttackMode <mode> [options]"
-    Write-Host ""
-    Write-Host "Required:"
-    Write-Host "  -Hashs            Path to .hc22000 files"
-    Write-Host "  -Hashcat          Path to hashcat folder"
-    Write-Host "  -AttackMode       wordlist | bruteforce | both"
-    Write-Host ""
-    Write-Host "Optional:"
-    Write-Host "  -HashcatHelp      Hashcat help menu"
-    Write-Host "  -Wordlist         Path to wordlists"
-    Write-Host "  -Params           Extra hashcat parameters"
-    Write-Host "  -Mode             Hash mode (default: 22000)"
-    Write-Host "  -MaskRuntime      Runtime per mask in seconds (default: 600)"
-    Write-Host "  -CooldownSeconds  Pause between runs for GPU cooling (default: 15)"
-    Write-Host "  -TempAbort        GPU temp limit to abort in C (default: 90)"
-    Write-Host "  -Workload         Hashcat workload 1-4 (default: 3)"
-    Write-Host "  -LogFile          Path to save log output"
-    Write-Host "  -VerboseMode      Enable detailed logs"
-    Write-Host ""
-    Write-Host "Example:" -ForegroundColor Yellow
-    Write-Host ".\HashCater.ps1 -Hashs C:\captured_files -Hashcat C:\hashcat -AttackMode both -Wordlist C:\wl"
+    Write-Host ".\HashCater.ps1 -Hashs <path> -Hashcat <path> -AttackMode <mode>"
     Write-Host ""
 }
 
@@ -56,48 +44,93 @@ if (-not $HashcatHelp -and (-not $Hashs -or -not $Hashcat -or -not $AttackMode))
     exit
 }
 
-if (-not (Test-Path $Hashcat)) {
-    throw "[ERROR] Hashcat path not found!"
-}
-
 $HashcatExe = Join-Path $Hashcat "hashcat.exe"
 
 if (-not (Test-Path $HashcatExe)) {
-    throw "[ERROR] hashcat.exe not found in provided path!"
+    throw "[ERROR] hashcat.exe not found!"
 }
 
-if ($HashcatHelp) {
-    Write-Host ""
-    Write-Host "[INFO] Showing hashcat help..." -ForegroundColor Yellow
-    Write-Host ""
-    & $HashcatExe --help
-    exit
+function Log {
+    param(
+        [string]$Message,
+        [string]$Color = "White"
+    )
+
+    $ts = Get-Date -Format "HH:mm:ss"
+
+    Write-Host "[$ts] $Message" -ForegroundColor $Color
+
+    if ($LogFile) {
+        "[$ts] $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8
+    }
 }
 
-if (-not (Test-Path $Hashs)) {
-    throw "[ERROR] Hashs path not found!"
-}
+function Get-GpuTemperature {
 
-function Log($msg, $color="White") {
-    $timestamp = (Get-Date).ToString("HH:mm:ss")
-    Write-Host "[$timestamp] $msg" -ForegroundColor $color
-    if ($LogFile) { "[$timestamp] $msg" | Out-File $LogFile -Append }
-}
+    $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 
-function Get-SSID($capFile) {
+    if (-not $nvidiaSmi) {
+        return $null
+    }
+
     try {
-        $lines = Get-Content $capFile
+
+        $temp = & nvidia-smi `
+            --query-gpu=temperature.gpu `
+            --format=csv,noheader,nounits 2>$null |
+            Select-Object -First 1
+
+        return [int]$temp.Trim()
+
+    }
+    catch {
+        return $null
+    }
+}
+
+function Wait-GpuCooldown {
+
+    while ($true) {
+
+        $temp = Get-GpuTemperature
+
+        if ($null -eq $temp) {
+            return
+        }
+
+        if ($temp -le $GpuTempRetain) {
+            return
+        }
+
+        Log "[COOLDOWN] GPU at ${temp}°C. Waiting..." Yellow
+
+        Start-Sleep -Seconds 30
+    }
+}
+
+function Get-SSID {
+
+    param([string]$CapFile)
+
+    try {
+
+        $lines = Get-Content $CapFile
 
         foreach ($line in $lines) {
+
             if ($line -match "^WPA\*(01|02)\*") {
+
                 $parts = $line -split "\*"
 
-                if ($parts.Count -ge 6 -and $parts[5] -match "^[0-9A-Fa-f]{2,}$") {
+                if ($parts.Count -ge 6 -and $parts[5] -match "^[0-9A-Fa-f]+$") {
+
                     $hex = $parts[5]
+
                     $bytes = for ($i = 0; $i -lt $hex.Length; $i += 2) {
                         [Convert]::ToByte($hex.Substring($i, 2), 16)
                     }
-                    return [System.Text.Encoding]::UTF8.GetString($bytes)
+
+                    return [Text.Encoding]::UTF8.GetString($bytes)
                 }
             }
         }
@@ -109,46 +142,81 @@ function Get-SSID($capFile) {
     }
 }
 
-function Get-PrioritizedMasks($ssid) {
-    $masks = @()
-    $masks += "?d?d?d?d?d?d?d?d"
-    $masks += "?d?d?d?d?d?d?d?d?d?d"
+function Get-PrioritizedMasks {
 
-    if ($ssid -and $ssid -ne "UNKNOWN") {
-        $base = ($ssid -replace '[^a-zA-Z0-9]', '').ToLower()
+    param([string]$SSID)
+
+    $masks = @(
+        "?d?d?d?d?d?d?d?d",
+        "?d?d?d?d?d?d?d?d?d?d"
+    )
+
+    if ($SSID -and $SSID -ne "UNKNOWN") {
+
+        $base = ($SSID -replace '[^a-zA-Z0-9]', '').ToLower()
 
         if ($base.Length -ge 4) {
+
             $masks += "$base@?d?d?d"
             $masks += "$base@?d?d?d?d"
-        }
-
-        if ($ssid -match "VIVO|CLARO|TP-LINK|NET|WIFI") {
-            $masks = @(
-                "?d?d?d?d?d?d?d?d",
-                "?d?d?d?d?d?d?d?d?d?d"
-            ) + $masks
         }
     }
 
     return $masks | Select-Object -Unique
 }
 
-function Run-Hashcat($arguments) {
-    $thermalArgs = "--hwmon-temp-abort=$TempAbort -w $Workload"
-    $fullArgs = "$arguments $thermalArgs"
+function Run-Hashcat {
 
-    if ($VerboseMode) { Log "[CMD] $HashcatExe $fullArgs" DarkGray }
+    param(
+        [string]$Arguments
+    )
 
-    $cmd = "$HashcatExe $fullArgs"
-    Invoke-Expression "& $cmd"
-    $exitCode = $LASTEXITCODE
+    Wait-GpuCooldown
 
-    if ($exitCode -eq -1 -or $exitCode -eq 255) {
-        Log "[WARN] Hashcat error (exit: $exitCode)" Red
+    $thermalArgs = @(
+        "--hwmon-temp-abort=$TempAbort"
+        "-w $Workload"
+    ) -join " "
+
+    $fullArgs = "$Arguments $thermalArgs"
+
+    if ($VerboseMode) {
+        Log "[CMD] $HashcatExe $fullArgs" DarkGray
     }
 
+    $process = Start-Process `
+        -FilePath $HashcatExe `
+        -ArgumentList $fullArgs `
+        -Wait `
+        -PassThru `
+        -NoNewWindow
+
+    $exitCode = $process.ExitCode
+
+    $temp = Get-GpuTemperature
+
+    if ($temp) {
+        Log "[GPU] Current temperature: ${temp}°C" Cyan
+    }
+
+    if ($exitCode -eq 255 -or $exitCode -eq -1) {
+        Log "[WARN] Hashcat exited with code $exitCode" Red
+    }
+
+    Log "[COOLDOWN] Sleeping $CooldownSeconds seconds..." Yellow
+
     Start-Sleep -Seconds $CooldownSeconds
+
     return $exitCode
+}
+
+if ($HashcatHelp) {
+    & $HashcatExe --help
+    exit
+}
+
+if (-not (Test-Path $Hashs)) {
+    throw "[ERROR] Hashs path not found!"
 }
 
 $Caps = Get-ChildItem $Hashs -Filter "*.hc22000"
@@ -157,56 +225,70 @@ if ($Caps.Count -eq 0) {
     throw "No .hc22000 files found"
 }
 
-$crackedCount = 0
+$CrackedCount = 0
 
 foreach ($Cap in $Caps) {
-    $capFile = $Cap.FullName
-    Log "[+] Processing: $capFile" Cyan
 
-    $ssid = Get-SSID $capFile
-    Log "[SSID] $ssid" Yellow
+    $CapFile = $Cap.FullName
 
-    $cracked = $false
+    Log "[+] Processing $CapFile" Cyan
+
+    $SSID = Get-SSID $CapFile
+
+    Log "[SSID] $SSID" Yellow
+
+    $Cracked = $false
 
     if ($AttackMode -in @("wordlist","both") -and $Wordlist) {
+
         $Wordlists = Get-ChildItem $Wordlist -Filter "*.txt"
 
-        foreach ($wl in $Wordlists) {
-            Log "[WL] $($wl.Name)"
+        foreach ($WL in $Wordlists) {
 
-            Run-Hashcat "-m $Mode `"$capFile`" `"$($wl.FullName)`" -a 0 $Params"
+            Log "[WL] $($WL.Name)"
 
-            $result = & $HashcatExe --show "$capFile" -m $Mode --quiet
+            Run-Hashcat "-m $Mode `"$CapFile`" `"$($WL.FullName)`" -a 0 $Params"
+
+            $result = & $HashcatExe --show "$CapFile" -m $Mode --quiet
 
             if ($result) {
-                Log "[CRACKED - WL] $result" Green
-                $cracked = $true
+
+                Log "[CRACKED] $result" Green
+
+                $Cracked = $true
                 break
             }
         }
     }
 
-    if ($cracked) { $crackedCount++; continue }
+    if (-not $Cracked -and $AttackMode -in @("bruteforce","both")) {
 
-    if ($AttackMode -in @("bruteforce","both")) {
-        $masks = Get-PrioritizedMasks $ssid
+        $Masks = Get-PrioritizedMasks $SSID
 
-        foreach ($mask in $masks) {
-            Log "[MASK] $mask"
+        foreach ($Mask in $Masks) {
 
-            Run-Hashcat "-m $Mode `"$capFile`" -a 3 $mask --runtime=$MaskRuntime $Params"
+            Log "[MASK] $Mask"
 
-            $result = & $HashcatExe --show "$capFile" -m $Mode --quiet
+            Run-Hashcat "-m $Mode `"$CapFile`" -a 3 $Mask --runtime=$MaskRuntime $Params"
+
+            $result = & $HashcatExe --show "$CapFile" -m $Mode --quiet
 
             if ($result) {
-                Log "[CRACKED - MASK] $result" Green
-                $cracked = $true
+
+                Log "[CRACKED] $result" Green
+
+                $Cracked = $true
                 break
             }
         }
     }
 
-    if ($cracked) { $crackedCount++ }
+    if ($Cracked) {
+        $CrackedCount++
+    }
 }
 
-Log "[DONE] Processed $($Caps.Count) files | Cracked: $crackedCount | Failed: $($Caps.Count - $crackedCount)" Cyan
+Log ""
+Log "[DONE] Processed: $($Caps.Count)" Cyan
+Log "[DONE] Cracked: $CrackedCount" Green
+Log "[DONE] Failed: $($Caps.Count - $CrackedCount)" Yellow
