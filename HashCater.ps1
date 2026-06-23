@@ -113,16 +113,13 @@ function Get-PrioritizedMasks($ssid) {
     $masks = @()
     $masks += "?d?d?d?d?d?d?d?d"
     $masks += "?d?d?d?d?d?d?d?d?d?d"
-    $masks += "?l?l?l?l?l?l?d?d"
-    $masks += "?l?l?l?l?d?d?d?d"
 
     if ($ssid -and $ssid -ne "UNKNOWN") {
         $base = ($ssid -replace '[^a-zA-Z0-9]', '').ToLower()
 
         if ($base.Length -ge 4) {
-            $masks += "$base?d?d"
-            $masks += "$base?d?d?d"
-            $masks += "$base?d?d?d?d"
+            $masks += "$base@?d?d?d"
+            $masks += "$base@?d?d?d?d"
         }
 
         if ($ssid -match "VIVO|CLARO|TP-LINK|NET|WIFI") {
@@ -206,21 +203,6 @@ foreach ($Cap in $Caps) {
                 $cracked = $true
                 break
             }
-        }
-    }
-
-    if (-not $cracked) {
-        Log "[FALLBACK] 8-digit numeric" Yellow
-
-        Run-Hashcat "-m $Mode `"$capFile`" -a 3 ?d?d?d?d?d?d?d?d $Params"
-
-        $result = & $HashcatExe --show "$capFile" -m $Mode --quiet
-
-        if ($result) {
-            Log "[CRACKED - FALLBACK] $result" Green
-            $cracked = $true
-        } else {
-            Log "[FAIL] NOT FOUND" Red
         }
     }
 
