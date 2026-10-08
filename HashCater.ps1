@@ -1,3 +1,4 @@
+#PARAMS FOR HASHCAT
 [CmdletBinding()]
 param(
     [string]$Hashs,
@@ -24,7 +25,7 @@ param(
 
     [switch]$VerboseMode
 )
-
+#HELP MESSAGE
 function Show-Help {
     Write-Host ""
     Write-Host "HashCater - Hashcat Automation Tool" -ForegroundColor Cyan
@@ -32,18 +33,18 @@ function Show-Help {
     Write-Host ".\HashCater.ps1 -Hashs <path> -Hashcat <path> -AttackMode <mode>"
     Write-Host ""
 }
-
+#CHECK ARGS
 if ($PSBoundParameters.Count -eq 0) {
     Show-Help
     exit
 }
-
+#CHECK ARGS
 if (-not $HashcatHelp -and (-not $Hashs -or -not $Hashcat -or -not $AttackMode)) {
     Write-Host "[ERROR] Missing required parameters!" -ForegroundColor Red
     Show-Help
     exit
 }
-
+#CHECK HASHCAT EXECUTABLE
 $HashcatExe = Join-Path $Hashcat "hashcat.exe"
 
 if (-not (Test-Path $HashcatExe)) {
@@ -64,7 +65,7 @@ function Log {
         "[$ts] $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8
     }
 }
-
+#GPU TEMP
 function Get-GpuTemperature {
 
     $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
@@ -87,7 +88,7 @@ function Get-GpuTemperature {
         return $null
     }
 }
-
+#GPU COOLDOWN
 function Wait-GpuCooldown {
 
     while ($true) {
@@ -107,14 +108,14 @@ function Wait-GpuCooldown {
         Start-Sleep -Seconds 30
     }
 }
-
+#GET SSID FROM HASH
 function Get-SSID {
 
-    param([string]$CapFile)
+    param([string]$HashFile)
 
     try {
 
-        $lines = Get-Content $CapFile
+        $lines = Get-Content $HashFile
 
         foreach ($line in $lines) {
 
@@ -141,7 +142,7 @@ function Get-SSID {
         return "UNKNOWN"
     }
 }
-
+#MASKS
 function Get-PrioritizedMasks {
 
     param([string]$SSID)
@@ -164,7 +165,7 @@ function Get-PrioritizedMasks {
 
     return $masks | Select-Object -Unique
 }
-
+#RUNNING
 function Run-Hashcat {
 
     param(
@@ -229,11 +230,11 @@ $CrackedCount = 0
 
 foreach ($Cap in $Caps) {
 
-    $CapFile = $Cap.FullName
+    $HashFile = $Cap.FullName
 
-    Log "[+] Processing $CapFile" Cyan
+    Log "[+] Processing $HashFile" Cyan
 
-    $SSID = Get-SSID $CapFile
+    $SSID = Get-SSID $HashFile
 
     Log "[SSID] $SSID" Yellow
 
@@ -247,9 +248,9 @@ foreach ($Cap in $Caps) {
 
             Log "[WL] $($WL.Name)"
 
-            Run-Hashcat "-m $Mode `"$CapFile`" `"$($WL.FullName)`" -a 0 $Params"
+            Run-Hashcat "-m $Mode `"$HashFile`" `"$($WL.FullName)`" -a 0 $Params"
 
-            $result = & $HashcatExe --show "$CapFile" -m $Mode --quiet
+            $result = & $HashcatExe --show "$HashFile" -m $Mode --quiet
 
             if ($result) {
 
@@ -269,9 +270,9 @@ foreach ($Cap in $Caps) {
 
             Log "[MASK] $Mask"
 
-            Run-Hashcat "-m $Mode `"$CapFile`" -a 3 $Mask --runtime=$MaskRuntime $Params"
+            Run-Hashcat "-m $Mode `"$HashFile`" -a 3 $Mask --runtime=$MaskRuntime $Params"
 
-            $result = & $HashcatExe --show "$CapFile" -m $Mode --quiet
+            $result = & $HashcatExe --show "$HashFile" -m $Mode --quiet
 
             if ($result) {
 
